@@ -65,9 +65,20 @@ const transformCustomer = (customer) => {
 // Get all customers
 app.get('/api/customers', async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
-    console.log('Retrieved customers:', customers.length);
-    res.json(customers.map(transformCustomer));
+    // Use collation for case-insensitive sorting
+    const customers = await Customer.find()
+      .collation({ locale: 'en', strength: 2 }) // strength: 2 for case-insensitive
+      .sort({ name: 1 }); // 1 for ascending order
+    
+    console.log('Retrieved and sorted customers:', customers.length);
+    const transformedCustomers = customers.map(transformCustomer);
+    
+    // Double-check sort in JavaScript to ensure correct ordering
+    const sortedCustomers = transformedCustomers.sort((a, b) => 
+      a.name.localeCompare(b.name, 'en', { sensitivity: 'base' })
+    );
+    
+    res.json(sortedCustomers);
   } catch (error) {
     console.error('Error fetching customers:', error);
     res.status(500).json({ message: 'Failed to fetch customers. Please try again.' });
