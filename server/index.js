@@ -10,10 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-  credentials: true
-}));
+app.use(cors());  // Allow all origins in production
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -111,8 +108,8 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Server is running on http://127.0.0.1:${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
   console.log(`MongoDB URI: ${process.env.MONGODB_URI ? 'is set' : 'is NOT set'}`);
 }).on('error', (err) => {
   console.error('Error starting server:', err);
