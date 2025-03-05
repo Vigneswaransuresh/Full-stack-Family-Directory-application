@@ -46,12 +46,28 @@ app.get('/', (req, res) => {
   `);
 });
 
+// Helper function to transform MongoDB document to frontend format
+const transformCustomer = (customer) => {
+  if (!customer) return null;
+  const transformed = customer.toObject();
+  transformed.id = transformed._id.toString();
+  delete transformed._id;
+  if (transformed.familyMembers) {
+    transformed.familyMembers = transformed.familyMembers.map(member => ({
+      ...member,
+      id: member._id.toString(),
+      _id: undefined
+    }));
+  }
+  return transformed;
+};
+
 // Get all customers
 app.get('/api/customers', async (req, res) => {
   try {
     const customers = await Customer.find().sort({ createdAt: -1 });
     console.log('Retrieved customers:', customers.length);
-    res.json(customers);
+    res.json(customers.map(transformCustomer));
   } catch (error) {
     console.error('Error fetching customers:', error);
     res.status(500).json({ message: 'Failed to fetch customers. Please try again.' });
@@ -64,7 +80,7 @@ app.post('/api/customers', async (req, res) => {
     const customer = new Customer(req.body);
     const savedCustomer = await customer.save();
     console.log('Created new customer:', savedCustomer._id);
-    res.status(201).json(savedCustomer);
+    res.status(201).json(transformCustomer(savedCustomer));
   } catch (error) {
     console.error('Error creating customer:', error);
     if (error.name === 'ValidationError') {
@@ -91,6 +107,7 @@ app.put('/api/customers/:id', validateObjectId, async (req, res) => {
 
     // Validate update data
     const updateData = { ...req.body };
+    delete updateData.id; // Remove frontend id
     delete updateData._id; // Prevent _id modification
     console.log('Processed update data:', JSON.stringify(updateData, null, 2));
 
@@ -104,7 +121,7 @@ app.put('/api/customers/:id', validateObjectId, async (req, res) => {
     );
 
     console.log('Update successful:', customer._id);
-    res.json(customer);
+    res.json(transformCustomer(customer));
   } catch (error) {
     console.error('Error updating customer:', error);
     console.error('Error details:', {
@@ -140,8 +157,12 @@ app.delete('/api/customers/:id', validateObjectId, async (req, res) => {
       throw new Error('Delete operation failed');
     }
 
-    console.log('Successfully deleted customer:', req.params.id);
-    res.json({ message: 'Customer deleted successfully', deletedId: req.params.id });
+    const deletedCustomer = transformCustomer(result);
+    console.log('Successfully deleted customer:', deletedCustomer.id);
+    res.json({ 
+      message: 'Customer deleted successfully', 
+      deletedId: deletedCustomer.id 
+    });
   } catch (error) {
     console.error('Error deleting customer:', error);
     console.error('Error details:', {
