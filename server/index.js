@@ -65,18 +65,42 @@ const transformCustomer = (customer) => {
 // Get all customers
 app.get('/api/customers', async (req, res) => {
   try {
+    console.log('Fetching customers from database...');
+    
     // Use collation for case-insensitive sorting
     const customers = await Customer.find()
       .collation({ locale: 'en', strength: 2 }) // strength: 2 for case-insensitive
       .sort({ name: 1 }); // 1 for ascending order
     
-    console.log('Retrieved and sorted customers:', customers.length);
+    console.log('Retrieved customers from database:', customers.length);
+    
+    // Transform customers for frontend
     const transformedCustomers = customers.map(transformCustomer);
     
     // Double-check sort in JavaScript to ensure correct ordering
     const sortedCustomers = transformedCustomers.sort((a, b) => 
       a.name.localeCompare(b.name, 'en', { sensitivity: 'base' })
     );
+    
+    // Verify sorting
+    console.log('Sorted customer names (first 5):');
+    sortedCustomers.slice(0, 5).forEach((customer, index) => {
+      console.log(`${index + 1}. ${customer.name}`);
+    });
+    
+    // Verify that the sorting is case-insensitive
+    const namesAreSorted = sortedCustomers.every((customer, index) => {
+      if (index === 0) return true;
+      const prev = sortedCustomers[index - 1].name.toLowerCase();
+      const curr = customer.name.toLowerCase();
+      return prev <= curr;
+    });
+    
+    console.log('Sorting verification:', namesAreSorted ? 'Correct ✓' : 'Incorrect ✗');
+    
+    if (!namesAreSorted) {
+      console.warn('Warning: Names may not be properly sorted');
+    }
     
     res.json(sortedCustomers);
   } catch (error) {
