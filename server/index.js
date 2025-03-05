@@ -14,6 +14,14 @@ app.use(cors());  // Allow all origins in production
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Validate MongoDB ObjectId middleware
+const validateObjectId = (req, res, next) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ message: 'Invalid customer ID format' });
+  }
+  next();
+};
+
 // Connect to MongoDB with more detailed error handling
 console.log('Attempting to connect to MongoDB...');
 mongoose.connect(process.env.MONGODB_URI)
@@ -46,7 +54,7 @@ app.get('/api/customers', async (req, res) => {
     res.json(customers);
   } catch (error) {
     console.error('Error fetching customers:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Failed to fetch customers. Please try again.' });
   }
 });
 
@@ -59,48 +67,67 @@ app.post('/api/customers', async (req, res) => {
     res.status(201).json(savedCustomer);
   } catch (error) {
     console.error('Error creating customer:', error);
-    res.status(400).json({ message: error.message });
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Invalid customer data provided.' });
+    }
+    res.status(500).json({ message: 'Failed to create customer. Please try again.' });
   }
 });
 
 // Update a customer
-app.put('/api/customers/:id', async (req, res) => {
+app.put('/api/customers/:id', validateObjectId, async (req, res) => {
   try {
-    const customer = await Customer.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-    if (!customer) {
+    // First check if the customer exists
+    const existingCustomer = await Customer.findById(req.params.id);
+    if (!existingCustomer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
+
+    // Validate update data
+    const updateData = { ...req.body };
+    delete updateData._id; // Prevent _id modification
+
+    const customer = await Customer.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { 
+        new: true,
+        runValidators: true // Run mongoose validations on update
+      }
+    );
+
     console.log('Updated customer:', req.params.id);
     res.json(customer);
   } catch (error) {
     console.error('Error updating customer:', error);
-    res.status(400).json({ message: error.message });
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Invalid update data provided.' });
+    }
+    res.status(500).json({ message: 'Failed to update customer. Please try again.' });
   }
 });
 
 // Delete a customer
-app.delete('/api/customers/:id', async (req, res) => {
+app.delete('/api/customers/:id', validateObjectId, async (req, res) => {
   try {
-    const customer = await Customer.findByIdAndDelete(req.params.id);
+    const customer = await Customer.findById(req.params.id);
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
+
+    await Customer.findByIdAndDelete(req.params.id);
     console.log('Deleted customer:', req.params.id);
     res.json({ message: 'Customer deleted successfully' });
   } catch (error) {
     console.error('Error deleting customer:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Failed to delete customer. Please try again.' });
   }
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  res.status(500).json({ message: 'Something went wrong! Please try again.' });
 });
 
 // Handle 404 routes
