@@ -77,15 +77,22 @@ app.post('/api/customers', async (req, res) => {
 // Update a customer
 app.put('/api/customers/:id', validateObjectId, async (req, res) => {
   try {
+    console.log('Received UPDATE request for customer ID:', req.params.id);
+    console.log('Update data:', JSON.stringify(req.body, null, 2));
+
     // First check if the customer exists
     const existingCustomer = await Customer.findById(req.params.id);
+    console.log('Existing customer:', existingCustomer ? 'Found' : 'Not found');
+    
     if (!existingCustomer) {
+      console.log('Customer not found for update:', req.params.id);
       return res.status(404).json({ message: 'Customer not found' });
     }
 
     // Validate update data
     const updateData = { ...req.body };
     delete updateData._id; // Prevent _id modification
+    console.log('Processed update data:', JSON.stringify(updateData, null, 2));
 
     const customer = await Customer.findByIdAndUpdate(
       req.params.id,
@@ -96,10 +103,16 @@ app.put('/api/customers/:id', validateObjectId, async (req, res) => {
       }
     );
 
-    console.log('Updated customer:', req.params.id);
+    console.log('Update successful:', customer._id);
     res.json(customer);
   } catch (error) {
     console.error('Error updating customer:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    
     if (error.name === 'ValidationError') {
       return res.status(400).json({ message: 'Invalid update data provided.' });
     }
@@ -110,16 +123,32 @@ app.put('/api/customers/:id', validateObjectId, async (req, res) => {
 // Delete a customer
 app.delete('/api/customers/:id', validateObjectId, async (req, res) => {
   try {
+    console.log('Received DELETE request for customer ID:', req.params.id);
+
     const customer = await Customer.findById(req.params.id);
+    console.log('Customer to delete:', customer ? 'Found' : 'Not found');
+    
     if (!customer) {
+      console.log('Customer not found for deletion:', req.params.id);
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    await Customer.findByIdAndDelete(req.params.id);
-    console.log('Deleted customer:', req.params.id);
-    res.json({ message: 'Customer deleted successfully' });
+    const result = await Customer.findByIdAndDelete(req.params.id);
+    console.log('Delete operation result:', result ? 'Success' : 'Failed');
+    
+    if (!result) {
+      throw new Error('Delete operation failed');
+    }
+
+    console.log('Successfully deleted customer:', req.params.id);
+    res.json({ message: 'Customer deleted successfully', deletedId: req.params.id });
   } catch (error) {
     console.error('Error deleting customer:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ message: 'Failed to delete customer. Please try again.' });
   }
 });
